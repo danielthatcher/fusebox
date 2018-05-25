@@ -10,48 +10,63 @@ import (
 	"bazil.org/fuse/fs"
 )
 
-type FunctionNode interface {
+// VarNodes represent nodes in the filesystem which expose a variable. These can be
+// any kind of node in the filesystem.
+type VarNode interface {
 	fs.Node
 	fs.HandleReadAller
 	fs.HandleWriter
 }
 
-// Nodeable objects
-type FunctionNodeable interface {
-	Node() FunctionNode
+// VarNodeables expose Node and DirentType functions to return a VarNode and the
+// type of this node in the filesystem respectively.
+type VarNodeable interface {
+	// Node should return a VarNode that can be mounted in the filesystem and used
+	// to expose the underlying data.
+	Node() VarNode
+
+	// DirentType should return a fuse.DirentType representing how the VarNode
+	// returned from Node() should be represented in the filesystem.
 	DirentType() fuse.DirentType
 }
 
-// Dir represents a directory in the filesystem. It contains subnodes of type Dir or FunctionNode
+// Dir represents a directory in the filesystem. It contains subnodes of type
+// fs.Node, usually Dir or VarNode.
 type Dir struct {
+	// A map of nodes contained within the directory.
 	SubNodes map[string]fs.Node
 }
 
+// Create a new, empty, director.
 func NewDir() *Dir {
 	return &Dir{SubNodes: make(map[string]fs.Node)}
 }
 
+// Add a node to the directory.
 func (d *Dir) AddNode(name string, node fs.Node) {
 	d.SubNodes[name] = node
 }
 
 var _ fs.Node = (*Dir)(nil)
 
-func (d Dir) Node() FunctionNode {
+// Implement the VarNodeable interface.
+func (d Dir) Node() VarNode {
 	return d
 }
 
+// Indicate that this is a directory.
 func (Dir) DirentType() fuse.DirentType {
 	return fuse.DT_Dir
 }
 
-// Attr is implemented to comply with the fs.Node interface. It sets the attributes
-// of the filesystem
+// Attr is implemented to comply with the fs.Node interface. By default a Dir
+// is readonly to all users.
 func (d Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = os.ModeDir | 0444
 	return nil
 }
 
+// Return the node corresponding to the given name if it exists.
 func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	node, ok := d.SubNodes[name]
 	if !ok {
@@ -60,13 +75,14 @@ func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	return node, nil
 }
 
+// Return a []fuse.Dirent representing all nodes in the Dir.
 func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	var subdirs []fuse.Dirent
 
 	for name, node := range d.SubNodes {
 
 		nodetype := fuse.DT_Dir
-		if _, ok := node.(FunctionNode); ok {
+		if _, ok := node.(VarNode); ok {
 			nodetype = fuse.DT_File
 		}
 
@@ -76,21 +92,23 @@ func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return subdirs, nil
 }
 
+// Cannot read all data from a directory.
 func (Dir) ReadAll(ctx context.Context) ([]byte, error) {
 	return nil, fuse.EPERM
 }
 
+// Cannot write directly to a directory.
 func (Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	return fuse.EPERM
 }
 
-var _ FunctionNodeable = (*Dir)(nil)
+var _ VarNodeable = (*Dir)(nil)
 
-// The FunctionNodeList interface is implemented by objectis which hold
-// a slice of FunctionNodeables This is designed to allow slices of
-// FunctionNodeables to be passed around, e.g. to SliceDir.
-type FunctionNodeList interface {
-	GetNode(i int) FunctionNode
+// The VarNodeList interface is implemented by objectis which hold
+// a slice of VarNodeables This is designed to allow slices of
+// VarNodeables to be passed around, e.g. to SliceDir.
+type VarNodeList interface {
+	GetNode(i int) VarNode
 	GetDirentType(i int) fuse.DirentType
 	Length() int
 }
@@ -100,13 +118,16 @@ type FunctionNodeList interface {
 // "3", and "4".
 type SliceDir struct {
 	Dir
-	Nodes FunctionNodeList
+	Nodes VarNodeList
 }
 
-func NewSliceDir(nodes FunctionNodeList) *SliceDir {
+// Create a new SliceDir containing elements from the given VarNodeList.
+// Elements are denoted by index in the list.
+func NewSliceDir(nodes VarNodeList) *SliceDir {
 	return &SliceDir{Nodes: nodes}
 }
 
+// Return the node corresponding to a given index.
 func (d SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	i, err := strconv.Atoi(name)
 	if err != nil || i >= d.Nodes.Length() {
@@ -116,6 +137,7 @@ func (d SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	return d.Nodes.GetNode(i), nil
 }
 
+// Return all nodes in the list.
 func (d SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	ret := make([]fuse.Dirent, d.Nodes.Length())
 	for i := range ret {

@@ -9,15 +9,16 @@ import (
 	"bazil.org/fuse"
 )
 
-// Creates a file from a pointer to a regexp.Regexp which is read and updated appropriately.  Implements the FunctionNode interface
+// Creates a file from a pointer to a regexp.Regexp which is read and updated
+// appropriately.
 type RegexpFile struct {
 	File
 	Data *regexp.Regexp
 }
 
-var _ FunctionNode = (*RegexpFile)(nil)
+var _ VarNode = (*RegexpFile)(nil)
 
-// NewRegexpFile returns a new RegexpFile using the given regexp.Regexp pointer
+// NewRegexpFile returns a new RegexpFile using the given regexp.Regexp pointer.
 func NewRegexpFile(Data *regexp.Regexp) *RegexpFile {
 	ret := &RegexpFile{Data: Data}
 	ret.Lock = &sync.RWMutex{}
@@ -27,12 +28,14 @@ func NewRegexpFile(Data *regexp.Regexp) *RegexpFile {
 	return ret
 }
 
-// Return the value of the regexp.Regexp
+// Return the value of the regexp.Regexp's text representation for displaying
+// in a file.
 func (rf *RegexpFile) valRead(ctx context.Context) ([]byte, error) {
 	return []byte((*rf.Data).String()), nil
 }
 
-// Modify the underlying regexp.Regexp
+// Attempt to compile the given regexp, and if successful, modify the
+// underlying regexp.Regexp.
 func (rf *RegexpFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	c := strings.TrimSpace(string(req.Data))
 	r, err := regexp.Compile(c)
@@ -54,8 +57,9 @@ func (rf RegexpFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	return nil
 }
 
-var _ FunctionNodeable = (*RegexpFile)(nil)
+var _ VarNodeable = (*RegexpFile)(nil)
 
-func (rf *RegexpFile) Node() FunctionNode {
+// *RegexpFile implements the VarNodeable interface.
+func (rf *RegexpFile) Node() VarNode {
 	return rf
 }

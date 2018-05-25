@@ -9,13 +9,13 @@ import (
 	"bazil.org/fuse"
 )
 
-// Creates a file from a pointer to a int which is read and updated appropriately. Implements the FunctionNode interface.
+// Creates a file from a pointer to a int which is read and updated appropriately.
 type IntFile struct {
 	File
 	Data *int
 }
 
-var _ FunctionNode = (*IntFile)(nil)
+var _ VarNode = (*IntFile)(nil)
 
 // NewIntFile returns a new IntFile using the given int pointer
 func NewIntFile(Data *int) *IntFile {
@@ -27,12 +27,12 @@ func NewIntFile(Data *int) *IntFile {
 	return ret
 }
 
-// Return the value of the int
+// Return the value of the int in a format for displaying in a file.
 func (f *IntFile) valRead(ctx context.Context) ([]byte, error) {
 	return []byte(strconv.Itoa(*f.Data)), nil
 }
 
-// Modify the underlying int
+// Validate the incoming data, and modify the value of the underlying int.
 func (f *IntFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	i, err := strconv.Atoi(strings.TrimSpace(string(req.Data)))
 	if err != nil {
@@ -53,8 +53,9 @@ func (f IntFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	return nil
 }
 
-var _ FunctionNodeable = (*IntFile)(nil)
+var _ VarNodeable = (*IntFile)(nil)
 
-func (f *IntFile) Node() FunctionNode {
+// *IntFile implements the VarNodeable interface.
+func (f *IntFile) Node() VarNode {
 	return f
 }

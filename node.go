@@ -8,6 +8,10 @@ import (
 	"bazil.org/fuse"
 )
 
+// File represents a file in the virtualfilesystem. Reading and writing is handled
+// by the ValRead and ValWrite functions, which normally read and write to an
+// underlying go variable. It should be possible to read from the Change channel
+// whenever the data is changed.
 type File struct {
 	// The file mode.
 	Mode os.FileMode
@@ -35,11 +39,14 @@ type File struct {
 	ValWrite func(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error
 }
 
+// Return the attributes of the file. These are displayed to the filesystem, and
+// should usually be enforced.
 func (f File) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
 	return nil
 }
 
+// Signify that this is a file.
 func (f File) DirentType() fuse.DirentType {
 	return fuse.DT_File
 }

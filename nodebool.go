@@ -9,15 +9,14 @@ import (
 )
 
 // Creates a file from a pointer to a bool which is read and updated appropriately.
-// New values are sent down the included channel. Implements the FunctionNode interface.
 type BoolFile struct {
 	File
 	Data *bool
 }
 
-var _ FunctionNode = (*BoolFile)(nil)
+var _ VarNode = (*BoolFile)(nil)
 
-// NewBoolFile returns a new BoolFile using the given bool pointer
+// NewBoolFile returns a new BoolFile using the given bool pointer.
 func NewBoolFile(Data *bool) *BoolFile {
 	ret := &BoolFile{Data: Data}
 	ret.Mode = 0666
@@ -28,7 +27,7 @@ func NewBoolFile(Data *bool) *BoolFile {
 	return ret
 }
 
-// Return the value of the bool
+// Return the value of the bool in a format to be displayted in a file.
 func (bf *BoolFile) valRead(ctx context.Context) ([]byte, error) {
 	if *bf.Data {
 		return []byte("1"), nil
@@ -37,7 +36,7 @@ func (bf *BoolFile) valRead(ctx context.Context) ([]byte, error) {
 	}
 }
 
-// Modify the underlying bool
+// Validate the incoming data and modify the underlying bool.
 func (bf *BoolFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	c := strings.TrimSpace(string(req.Data))
 	if c == "0" {
@@ -59,8 +58,9 @@ func (bf BoolFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	return nil
 }
 
-var _ FunctionNodeable = (*BoolFile)(nil)
+var _ VarNodeable = (*BoolFile)(nil)
 
-func (bf *BoolFile) Node() FunctionNode {
+// *BoolFile implements the VarNodeable interface.
+func (bf *BoolFile) Node() VarNode {
 	return bf
 }
