@@ -50,24 +50,24 @@ func (d *Dir) AddNode(name string, node fs.Node) {
 var _ fs.Node = (*Dir)(nil)
 
 // Implement the VarNodeable interface.
-func (d Dir) Node() VarNode {
+func (d *Dir) Node() VarNode {
 	return d
 }
 
 // Indicate that this is a directory.
-func (Dir) DirentType() fuse.DirentType {
+func (*Dir) DirentType() fuse.DirentType {
 	return fuse.DT_Dir
 }
 
 // Attr is implemented to comply with the fs.Node interface. By default a Dir
 // is readonly to all users.
-func (d Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = os.ModeDir | 0444
 	return nil
 }
 
 // Return the node corresponding to the given name if it exists.
-func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	node, ok := d.SubNodes[name]
 	if !ok {
 		return nil, fuse.ENOENT
@@ -76,7 +76,7 @@ func (d Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 }
 
 // Return a []fuse.Dirent representing all nodes in the Dir.
-func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	var subdirs []fuse.Dirent
 
 	for name, node := range d.SubNodes {
@@ -93,12 +93,12 @@ func (d Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 }
 
 // Cannot read all data from a directory.
-func (Dir) ReadAll(ctx context.Context) ([]byte, error) {
+func (*Dir) ReadAll(ctx context.Context) ([]byte, error) {
 	return nil, fuse.EPERM
 }
 
 // Cannot write directly to a directory.
-func (Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+func (*Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	return fuse.EPERM
 }
 
@@ -128,7 +128,7 @@ func NewSliceDir(nodes VarNodeList) *SliceDir {
 }
 
 // Return the node corresponding to a given index.
-func (d SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+func (d *SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	i, err := strconv.Atoi(name)
 	if err != nil || i >= d.Nodes.Length() {
 		return nil, fuse.ENOENT
@@ -138,7 +138,7 @@ func (d SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 }
 
 // Return all nodes in the list.
-func (d SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+func (d *SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	ret := make([]fuse.Dirent, d.Nodes.Length())
 	for i := range ret {
 		ret[i] = fuse.Dirent{Name: strconv.Itoa(i),

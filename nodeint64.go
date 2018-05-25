@@ -45,7 +45,7 @@ func (f *Int64File) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *
 }
 
 // Implement Attr to implement the fs.Node int64erface
-func (f Int64File) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (f *Int64File) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
 	f.Lock.RLock()
 	defer f.Lock.RUnlock()

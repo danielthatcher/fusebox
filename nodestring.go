@@ -39,7 +39,7 @@ func (sf *StringFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp
 }
 
 // Implement Attr to implement the fs.Node interface
-func (sf StringFile) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (sf *StringFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = sf.Mode
 	sf.Lock.RLock()
 	defer sf.Lock.RUnlock()

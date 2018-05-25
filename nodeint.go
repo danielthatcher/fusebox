@@ -45,7 +45,7 @@ func (f *IntFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fu
 }
 
 // Implement Attr to implement the fs.Node interface
-func (f IntFile) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (f *IntFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
 	f.Lock.RLock()
 	defer f.Lock.RUnlock()

@@ -49,7 +49,7 @@ func (rf *RegexpFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp
 }
 
 // Implement Attr to implement the fs.Node interface
-func (rf RegexpFile) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (rf *RegexpFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = rf.Mode
 	rf.Lock.RLock()
 	defer rf.Lock.RUnlock()

@@ -41,13 +41,13 @@ type File struct {
 
 // Return the attributes of the file. These are displayed to the filesystem, and
 // should usually be enforced.
-func (f File) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (f *File) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
 	return nil
 }
 
 // Signify that this is a file.
-func (f File) DirentType() fuse.DirentType {
+func (f *File) DirentType() fuse.DirentType {
 	return fuse.DT_File
 }
 
@@ -88,6 +88,6 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 }
 
 // Implement Fsync to implement the fs.NodeFsyncer interface
-func (BoolFile) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
+func (*File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	return nil
 }

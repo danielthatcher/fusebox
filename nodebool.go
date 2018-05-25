@@ -52,7 +52,7 @@ func (bf *BoolFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *
 }
 
 // Implement Attr to implement the fs.Node interface
-func (bf BoolFile) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (bf *BoolFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = bf.Mode
 	attr.Size = 1
 	return nil

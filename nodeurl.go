@@ -45,7 +45,7 @@ func (f *URLFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fu
 }
 
 // Implement Attr to implement the fs.Node interface.
-func (f URLFile) Attr(ctx context.Context, attr *fuse.Attr) error {
+func (f *URLFile) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
 	f.Lock.RLock()
 	defer f.Lock.RUnlock()
