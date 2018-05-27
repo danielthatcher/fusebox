@@ -2,6 +2,7 @@ package fusebox
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -142,6 +143,57 @@ func (d *SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	for i := range ret {
 		ret[i] = fuse.Dirent{Name: strconv.Itoa(i),
 			Type: d.Nodes.GetDirentType(i)}
+	}
+
+	return ret, nil
+}
+
+// The VarNodeMap interface is implemented by objectes which can return
+// a VarNodeable for a given set of keys, acting similar to a map.
+type VarNodeMap interface {
+	// Should return a VarNode if the key is valid then the second return value
+	// should be true, otherwise it should be false.
+	GetNode(k string) (VarNode, bool)
+
+	// Should return the dirent type for the node with the given key. If the
+	// node doesn't exist, the second return value should be false.
+	GetDirentType(k string) (fuse.DirentType, bool)
+
+	// Should return a slice of all the valid keys
+	GetKeys() []string
+}
+
+// MapDir creates a directory from a VarNodeMap with nodes named after the
+// VarNodeMap's keys.
+type MapDir struct {
+	Dir
+	Nodes VarNodeMap
+}
+
+// Returns a new MapDir backed by nodes.
+func NewMapDir(nodes VarNodeMap) *MapDir {
+	return &MapDir{Nodes: nodes}
+}
+
+func (d *MapDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	n, ok := d.Nodes.GetNode(name)
+	if !ok {
+		return nil, fuse.ENOENT
+	}
+
+	return n, nil
+}
+
+func (d *MapDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+	keys := d.Nodes.GetKeys()
+	ret := make([]fuse.Dirent, len(keys))
+	for i, k := range d.Nodes.GetKeys() {
+		t, ok := d.Nodes.GetDirentType(k)
+		if !ok {
+			// Should never be reached
+			panic(fmt.Sprintf("Cannot get DirentType for node %v", k))
+		}
+		ret[i] = fuse.Dirent{Name: k, Type: t}
 	}
 
 	return ret, nil
