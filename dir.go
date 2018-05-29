@@ -47,6 +47,18 @@ func (d *Dir) AddNode(name string, node fs.Node) {
 	d.SubNodes[name] = node
 }
 
+// RemoveNode removes a node from the dir, and returns whether the node originally
+// existed.
+func (d *Dir) RemoveNode(k string) bool {
+	_, ok := d.SubNodes[k]
+	if ok {
+		delete(d.SubNodes, k)
+		return true
+	}
+
+	return false
+}
+
 var _ fs.Node = (*Dir)(nil)
 
 // Implement the VarNodeable interface.
