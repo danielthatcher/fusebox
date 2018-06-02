@@ -35,6 +35,10 @@ type VarNodeable interface {
 type Dir struct {
 	// A map of nodes contained within the directory.
 	SubNodes map[string]fs.Node
+
+	// Rm is a function that is called whenever a node is removed. If nil,
+	// this is not called
+	Rm func(ctx context.Context, req *fuse.RemoveRequest) error
 }
 
 // Create a new, empty, director.
@@ -94,8 +98,8 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	for name, node := range d.SubNodes {
 
 		nodetype := fuse.DT_Dir
-		if _, ok := node.(VarNode); ok {
-			nodetype = fuse.DT_File
+		if vnode, ok := node.(VarNodeable); ok {
+			nodetype = vnode.DirentType()
 		}
 
 		subdirs = append(subdirs, fuse.Dirent{Name: name, Type: nodetype})
@@ -114,14 +118,32 @@ func (*Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteR
 	return fuse.EPERM
 }
 
+func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
+	if d.Rm == nil {
+		return fuse.EPERM
+	}
+	return d.Rm(ctx, req)
+}
+
 var _ VarNodeable = (*Dir)(nil)
 
 // The VarNodeList interface is implemented by objectis which hold
 // a slice of VarNodeables This is designed to allow slices of
 // VarNodeables to be passed around, e.g. to SliceDir.
 type VarNodeList interface {
+	// GetNode should return a node for the given index.
 	GetNode(i int) VarNode
+
+	// GetDirentType should return the fuse.DirentType for the node at the
+	// given index.
 	GetDirentType(i int) fuse.DirentType
+
+	// Remove should attempt to remove the node at the given index. If this is
+	// not permitted, then Remove should return false, otherwise Remove should
+	// return true.
+	Remove(i int) bool
+
+	// Length should return the number of nodes.
 	Length() int
 }
 
@@ -158,6 +180,21 @@ func (d *SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	}
 
 	return ret, nil
+}
+
+var _ fs.NodeRemover = (*SliceDir)(nil)
+
+func (d *SliceDir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
+	i, err := strconv.Atoi(req.Name)
+	if err != nil {
+		return fuse.ENOENT
+	}
+
+	ok := d.Nodes.Remove(i)
+	if !ok {
+		return fuse.EPERM
+	}
+	return nil
 }
 
 // The VarNodeMap interface is implemented by objectes which can return
