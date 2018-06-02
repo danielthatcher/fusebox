@@ -38,10 +38,9 @@ func (f *FS) Mount(path string) error {
 	}
 
 	f.conn = c
-	err = fs.Serve(f.conn, f)
-	if err != nil {
-		return fmt.Errorf("failed to server: %v", err)
-	}
+	go func() {
+		fs.Serve(f.conn, f)
+	}()
 
 	<-f.conn.Ready
 	if err = f.conn.MountError; err != nil {
