@@ -23,12 +23,18 @@ type File struct {
 	// A lock used to synchronise reads/writes
 	Lock *sync.RWMutex
 
+	// The Element is used to interact with the underlying data.
+	Element FileElement
+}
+
+// The FileElement interface is used by File to interact with the underlying data.
+type FileElement interface {
 	// ValRead should return the value of the underlying data converted to
 	// []byte, and any errors. ctx is passed in from ReadAll, and the return
 	// value is used as the return value of ReadAll.
 	//
 	// This function is intended to be masked by any struct that embeds File.
-	ValRead func(ctx context.Context) ([]byte, error)
+	ValRead(ctx context.Context) ([]byte, error)
 
 	// ValWrite should modify the underlying data from the data given in req, as
 	// well as setting resp.Size to reflect how much data was written. The
@@ -36,25 +42,46 @@ type File struct {
 	// return value of Write.
 	//
 	// This function is intended to be masked by any structs that embed File.
-	ValWrite func(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error
+	ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error
+
+	// Size should return the length of the underlyig data in the format in
+	// which it will be displayted
+	Size(ctx context.Context) (uint64, error)
 }
 
-// Return the attributes of the file. These are displayed to the filesystem, and
-// should usually be enforced.
+// NewFile returns a new file based on the given FileElement. This FileElement
+// is used to read and write data from.
+func NewFile(e FileElement) *File {
+	return &File{
+		Mode:    0666,
+		Lock:    &sync.RWMutex{},
+		Change:  make(chan int),
+		Element: e,
+	}
+}
+
+// Attr returns the attributes of the file. These are displayed to the filesystem,
+// and should usually be enforced. This is implemented to implement the fs.Node
+// interface.
 func (f *File) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Mode = f.Mode
+	l, err := f.Element.Size(ctx)
+	if err != nil {
+		return err
+	}
+	attr.Size = l
 	return nil
 }
 
-// Signify that this is a file.
+// DirentType will return fuse.DT_File for File. This is implemented to implement
+// the VarNode interface.
 func (f *File) DirentType() fuse.DirentType {
 	return fuse.DT_File
 }
 
-// Implement the fs.HandleReadAller interface, with a call to ValRead which
-// should be masked by structs which embed File. This function also makes a
-// RLock and RUnlock calls to the Lock, as well as checking the permissions
-// from the value of Mode.
+// ReadAll returns all the data from the File's element by calling its ValRead
+// function. This function also makes a RLock and RUnlock calls to the Lock, as
+// well as checking the permissions from the value of Mode.
 func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
 	if f.Mode&0444 == 0 {
 		return nil, fuse.EPERM
@@ -62,14 +89,13 @@ func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
 
 	f.Lock.RLock()
 	defer f.Lock.RUnlock()
-	return f.ValRead(ctx)
+	return f.Element.ValRead(ctx)
 }
 
-// Implement the fs.HandleWriter interface, with a call to ValWrite which
-// should be masked by structs that embed File. If the Change channel is not
-// empty, a value is  sent through it to signal a change in the data to any
-// listening routines. This function also makes Lock and Unlock calls to the
-// Lock, as well as checking permissions from the value of Mode.
+// Write writes the data to the File's element by calling its ValWrite function.
+// If the Change channel is not empty, a value is  sent through it to signal a
+// change in the data to any listening routines. This function also makes Lock and
+// Unlock calls to the Lock, as well as checking permissions from the value of Mode.
 func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	if f.Mode&0222 == 0 {
 		return fuse.EPERM
@@ -84,10 +110,10 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
-	return f.ValWrite(ctx, req, resp)
+	return f.Element.ValWrite(ctx, req, resp)
 }
 
-// Implement Fsync to implement the fs.NodeFsyncer interface
+// Fsync is implemented to implement the fs.NodeFsyncer interface
 func (*File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	return nil
 }

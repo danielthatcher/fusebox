@@ -10,7 +10,7 @@ import (
 	"bazil.org/fuse/fs"
 )
 
-// VarNodes represent nodes in the filesystem which expose a variable. These can be
+// VarNode represent a node in the filesystem which expose a variable. These can be
 // any kind of node in the filesystem.
 type VarNode interface {
 	fs.Node
@@ -18,7 +18,7 @@ type VarNode interface {
 	fs.HandleWriter
 }
 
-// VarNodeables expose Node and DirentType functions to return a VarNode and the
+// VarNodeable exposes  a Node and DirentType functions to return a VarNode and the
 // type of this node in the filesystem respectively.
 type VarNodeable interface {
 	// Node should return a VarNode that can be mounted in the filesystem and used

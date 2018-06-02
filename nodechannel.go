@@ -2,30 +2,23 @@ package fusebox
 
 import (
 	"context"
-	"sync"
 
 	"bazil.org/fuse"
 )
 
-// ChanFile will do a non-blocking send to a channel whenever data is written
-// to it. It is useful for providing triggers in the filesystem to trigger
-// certain actions.
-type ChanFile struct {
-	File
+type channelElement struct {
 	Data chan int
 }
 
-var _ VarNode = (*ChanFile)(nil)
-
-func NewChanFile(c chan int) *ChanFile {
-	ret := &ChanFile{Data: c}
-	ret.Lock = &sync.RWMutex{}
+// NewChanFile returns a File which writes an arbitrary int down the given channel
+// whenever it is written to.
+func NewChanFile(c chan int) *File {
+	ret := NewFile(&channelElement{c})
 	ret.Mode = 0222
-	ret.ValWrite = ret.valWrite
 	return ret
 }
 
-func (cf *ChanFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+func (cf *channelElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	select {
 	case cf.Data <- 1:
 	default:
@@ -35,12 +28,10 @@ func (cf *ChanFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *
 	return nil
 }
 
-func (cf *ChanFile) Attr(ctx context.Context, attr *fuse.Attr) error {
-	attr.Mode = cf.Mode
-	attr.Size = 0
-	return nil
+func (cf *channelElement) ValRead(context.Context) ([]byte, error) {
+	return nil, fuse.EPERM
 }
 
-func (cf *ChanFile) Node() VarNode {
-	return cf
+func (cf *channelElement) Size(context.Context) (uint64, error) {
+	return 0, nil
 }

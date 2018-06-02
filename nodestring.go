@@ -3,53 +3,30 @@ package fusebox
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"bazil.org/fuse"
 )
 
-// Creates a file from a pointer to a string which is read and updated appropriately.
-type StringFile struct {
-	File
+type stringElement struct {
 	Data *string
 }
 
-var _ VarNode = (*StringFile)(nil)
-
-// NewStringFile returns a new StringFile using the given string pointer
-func NewStringFile(Data *string) *StringFile {
-	ret := &StringFile{Data: Data}
-	ret.Mode = 0666
-	ret.Lock = &sync.RWMutex{}
-	ret.ValRead = ret.valRead
-	ret.ValWrite = ret.valWrite
-	return ret
+// NewStringFile returns a File which has an element that reads from and
+// writes to the given string pointer.
+func NewStringFile(s *string) *File {
+	return NewFile(&stringElement{Data: s})
 }
 
-// Return the value of the string.
-func (sf *StringFile) valRead(ctx context.Context) ([]byte, error) {
+func (sf *stringElement) ValRead(ctx context.Context) ([]byte, error) {
 	return []byte(*sf.Data), nil
 }
 
-// Modify the underlying string.
-func (sf *StringFile) valWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+func (sf *stringElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	(*sf.Data) = strings.TrimSpace(string(req.Data))
 	resp.Size = len(req.Data)
 	return nil
 }
 
-// Implement Attr to implement the fs.Node interface
-func (sf *StringFile) Attr(ctx context.Context, attr *fuse.Attr) error {
-	attr.Mode = sf.Mode
-	sf.Lock.RLock()
-	defer sf.Lock.RUnlock()
-	attr.Size = uint64(len(*sf.Data))
-	return nil
-}
-
-var _ VarNodeable = (*StringFile)(nil)
-
-// *StringFile implements the VarNodeable interface.
-func (sf *StringFile) Node() VarNode {
-	return sf
+func (sf *stringElement) Size(context.Context) (uint64, error) {
+	return uint64(len(*sf.Data)), nil
 }
