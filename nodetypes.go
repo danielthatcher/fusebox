@@ -91,7 +91,12 @@ func (f *intElement) ValRead(ctx context.Context) ([]byte, error) {
 }
 
 func (f *intElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
-	i, err := strconv.Atoi(strings.TrimSpace(string(req.Data)))
+	trimmed := strings.TrimSpace(string(req.Data))
+	if len(trimmed) == 0 {
+		trimmed = "0"
+	}
+
+	i, err := strconv.Atoi(trimmed)
 	if err != nil {
 		return fuse.ERANGE
 	}
@@ -120,7 +125,12 @@ func (f *int64Element) ValRead(ctx context.Context) ([]byte, error) {
 }
 
 func (f *int64Element) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
-	i, err := strconv.ParseInt(strings.TrimSpace(string(req.Data)), 10, 64)
+	trimmed := strings.TrimSpace(string(req.Data))
+	if len(trimmed) == 0 {
+		trimmed = "0"
+	}
+
+	i, err := strconv.ParseInt(trimmed, 10, 64)
 	if err != nil {
 		return fuse.ERANGE
 	}
