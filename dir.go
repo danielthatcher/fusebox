@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
+	"sync"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -30,85 +30,108 @@ type VarNodeable interface {
 	DirentType() fuse.DirentType
 }
 
+// The DirElement interface is used by a dir to interact with the underlying data.
+type DirElement interface {
+	// GetNode should return a VarNode if the given key is valid, otherwise an
+	// error that is passed in the return value to Dir.Lookup
+	GetNode(ctx context.Context, k string) (VarNode, error)
+
+	// Should return the dirent type for the node with the given key. If the key
+	// is invalid, then an approriate error should be returned.
+	GetDirentType(ctx context.Context, k string) (fuse.DirentType, error)
+
+	// Should return a slice of all the valid keys
+	GetKeys(ctx context.Context) []string
+
+	// AddNode and RemoveNode should attempt to add and remove a node to the
+	//given dir. If this fails, and error should be returned.
+	AddNode(name string, node interface{}) error
+	RemoveNode(name string) error
+}
+
 // Dir represents a directory in the filesystem. It contains subnodes of type
 // fs.Node, usually Dir or VarNode.
 type Dir struct {
-	// A map of nodes contained within the directory.
-	SubNodes map[string]fs.Node
+	// The directory's mode
+	Mode os.FileMode
 
-	// Rm is a function that is called whenever a node is removed. If nil,
-	// this is not called
-	Rm func(ctx context.Context, req *fuse.RemoveRequest) error
+	// The Element is used to interact with the underlying data
+	mu      *sync.RWMutex
+	Element DirElement
 }
 
-// Create a new, empty, director.
-func NewDir() *Dir {
-	return &Dir{SubNodes: make(map[string]fs.Node)}
+// NewDir creates a new directoy based on the given DirElement. This DirElement is
+// used to provide information on the contained nodes.
+func NewDir(e DirElement) *Dir {
+	return &Dir{
+		Mode:    os.ModeDir | 0444,
+		Element: e,
+		mu:      &sync.RWMutex{},
+	}
 }
 
-// Add a node to the directory.
-func (d *Dir) AddNode(name string, node fs.Node) {
-	d.SubNodes[name] = node
+// AddNode adds a node to the directory.
+func (d *Dir) AddNode(name string, node fs.Node) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.Element.AddNode(name, node)
 }
 
 // RemoveNode removes a node from the dir, and returns whether the node originally
 // existed.
 func (d *Dir) RemoveNode(k string) bool {
-	_, ok := d.SubNodes[k]
-	if ok {
-		delete(d.SubNodes, k)
-		return true
-	}
-
-	return false
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	err := d.Element.RemoveNode(k)
+	return err == nil
 }
 
 var _ fs.Node = (*Dir)(nil)
+var _ VarNodeable = (*Dir)(nil)
 
-// Implement the VarNodeable interface.
+// Node is implemented to implement the VarNodeable interface.
 func (d *Dir) Node() VarNode {
 	return d
 }
 
-// Indicate that this is a directory.
+// DirentType indcates that this is a directory.
 func (*Dir) DirentType() fuse.DirentType {
 	return fuse.DT_Dir
 }
 
-// Attr is implemented to comply with the fs.Node interface. By default a Dir
-// is readonly to all users.
+// Attr is implemented to comply with the fs.Node interface. It sets the mode
+// in the filesystem to the value of Dir.Mode
 func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
-	attr.Mode = os.ModeDir | 0444
+	attr.Mode = d.Mode
 	return nil
 }
 
-// Return the node corresponding to the given name if it exists.
+// Lookup returns the node corresponding to the given name if it exists.
 func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	node, ok := d.SubNodes[name]
-	if !ok {
-		return nil, fuse.ENOENT
-	}
-	return node, nil
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.Element.GetNode(ctx, name)
 }
 
-// Return a []fuse.Dirent representing all nodes in the Dir.
+// ReadDirAll returns a []fuse.Dirent representing all nodes in the Dir.
 func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	var subdirs []fuse.Dirent
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	keys := d.Element.GetKeys(ctx)
+	subdirs := make([]fuse.Dirent, len(keys))
 
-	for name, node := range d.SubNodes {
-
-		nodetype := fuse.DT_Dir
-		if vnode, ok := node.(VarNodeable); ok {
-			nodetype = vnode.DirentType()
+	for i, k := range keys {
+		t, err := d.Element.GetDirentType(ctx, k)
+		if err != nil {
+			panic(fmt.Sprintf("GetDirentType did not return ok for key '%v' returned by GetKeys", k))
 		}
-
-		subdirs = append(subdirs, fuse.Dirent{Name: name, Type: nodetype})
+		subdirs[i] = fuse.Dirent{Name: k, Type: t}
 	}
 
 	return subdirs, nil
 }
 
-// Cannot read all data from a directory.
+// ReadAll returns fuse.EPERM for Dir.
 func (*Dir) ReadAll(ctx context.Context) ([]byte, error) {
 	return nil, fuse.EPERM
 }
@@ -118,132 +141,10 @@ func (*Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteR
 	return fuse.EPERM
 }
 
+// Remove handles a request from the filesystem to remove a given node, passing
+// the request through to the Dir's element
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
-	if d.Rm == nil {
-		return fuse.EPERM
-	}
-	return d.Rm(ctx, req)
-}
-
-var _ VarNodeable = (*Dir)(nil)
-
-// The VarNodeList interface is implemented by objectis which hold
-// a slice of VarNodeables This is designed to allow slices of
-// VarNodeables to be passed around, e.g. to SliceDir.
-type VarNodeList interface {
-	// GetNode should return a node for the given index.
-	GetNode(i int) VarNode
-
-	// GetDirentType should return the fuse.DirentType for the node at the
-	// given index.
-	GetDirentType(i int) fuse.DirentType
-
-	// Remove should attempt to remove the node at the given index. If this is
-	// not permitted, then Remove should return false, otherwise Remove should
-	// return true.
-	Remove(i int) bool
-
-	// Length should return the number of nodes.
-	Length() int
-}
-
-// SliceDir exposes the elements of a slice through the slice's indexes. If a
-// slice has length 5, then a slicedir will create nodes named "0", "1", "2",
-// "3", and "4".
-type SliceDir struct {
-	Dir
-	Nodes VarNodeList
-}
-
-// Create a new SliceDir containing elements from the given VarNodeList.
-// Elements are denoted by index in the list.
-func NewSliceDir(nodes VarNodeList) *SliceDir {
-	return &SliceDir{Nodes: nodes}
-}
-
-// Return the node corresponding to a given index.
-func (d *SliceDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	i, err := strconv.Atoi(name)
-	if err != nil || i >= d.Nodes.Length() {
-		return nil, fuse.ENOENT
-	}
-
-	return d.Nodes.GetNode(i), nil
-}
-
-// Return all nodes in the list.
-func (d *SliceDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	ret := make([]fuse.Dirent, d.Nodes.Length())
-	for i := range ret {
-		ret[i] = fuse.Dirent{Name: strconv.Itoa(i),
-			Type: d.Nodes.GetDirentType(i)}
-	}
-
-	return ret, nil
-}
-
-var _ fs.NodeRemover = (*SliceDir)(nil)
-
-func (d *SliceDir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
-	i, err := strconv.Atoi(req.Name)
-	if err != nil {
-		return fuse.ENOENT
-	}
-
-	ok := d.Nodes.Remove(i)
-	if !ok {
-		return fuse.EPERM
-	}
-	return nil
-}
-
-// The VarNodeMap interface is implemented by objectes which can return
-// a VarNodeable for a given set of keys, acting similar to a map.
-type VarNodeMap interface {
-	// Should return a VarNode if the key is valid then the second return value
-	// should be true, otherwise it should be false.
-	GetNode(k string) (VarNode, bool)
-
-	// Should return the dirent type for the node with the given key. If the
-	// node doesn't exist, the second return value should be false.
-	GetDirentType(k string) (fuse.DirentType, bool)
-
-	// Should return a slice of all the valid keys
-	GetKeys() []string
-}
-
-// MapDir creates a directory from a VarNodeMap with nodes named after the
-// VarNodeMap's keys.
-type MapDir struct {
-	Dir
-	Nodes VarNodeMap
-}
-
-// Returns a new MapDir backed by nodes.
-func NewMapDir(nodes VarNodeMap) *MapDir {
-	return &MapDir{Nodes: nodes}
-}
-
-func (d *MapDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
-	n, ok := d.Nodes.GetNode(name)
-	if !ok {
-		return nil, fuse.ENOENT
-	}
-
-	return n, nil
-}
-
-func (d *MapDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
-	keys := d.Nodes.GetKeys()
-	ret := make([]fuse.Dirent, len(keys))
-	for i, k := range d.Nodes.GetKeys() {
-		t, ok := d.Nodes.GetDirentType(k)
-		if !ok {
-			// Should never be reached
-			panic(fmt.Sprintf("Cannot get DirentType for node %v", k))
-		}
-		ret[i] = fuse.Dirent{Name: k, Type: t}
-	}
-
-	return ret, nil
+	d.mu.Lock()
+	d.mu.Unlock()
+	return d.Element.RemoveNode(req.Name)
 }

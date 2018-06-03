@@ -23,6 +23,12 @@ func NewFS(root VarNodeable) *FS {
 	return ret
 }
 
+// NewEmptyFS returns a FS with an empty Dir as its root node. This is equivalent
+// to NewFS(NewEmtpyDir())
+func NewEmptyFS() *FS {
+	return NewFS(NewEmptyDir())
+}
+
 // Root returns the root directory of the filesystem
 func (f *FS) Root() (fs.Node, error) {
 	return f.RootNode.Node(), nil

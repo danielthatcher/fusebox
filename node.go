@@ -49,6 +49,8 @@ type FileElement interface {
 	Size(ctx context.Context) (uint64, error)
 }
 
+var _ VarNodeable = (*File)(nil)
+
 // NewFile returns a new file based on the given FileElement. This FileElement
 // is used to read and write data from.
 func NewFile(e FileElement) *File {
@@ -116,4 +118,10 @@ func (f *File) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.Wri
 // Fsync is implemented to implement the fs.NodeFsyncer interface
 func (*File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	return nil
+}
+
+// Node returns the File itself. It is implemented to implement the VarNodeable
+// interface.
+func (f *File) Node() VarNode {
+	return f
 }
