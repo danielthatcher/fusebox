@@ -55,6 +55,9 @@ type Dir struct {
 	// The directory's mode
 	Mode os.FileMode
 
+	// The flags used for in the response for fs.Open
+	OpenFlags fuse.OpenResponseFlags
+
 	// The Element is used to interact with the underlying data
 	mu      *sync.RWMutex
 	Element DirElement
@@ -147,4 +150,10 @@ func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 	d.mu.Lock()
 	d.mu.Unlock()
 	return d.Element.RemoveNode(req.Name)
+}
+
+// Open returns the Dir as the handle, setting the response flags with Dir.OpenFlags
+func (d *Dir) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= d.OpenFlags
+	return d, nil
 }

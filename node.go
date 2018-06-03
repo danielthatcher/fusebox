@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 // File represents a file in the virtualfilesystem. Reading and writing is handled
@@ -15,6 +16,9 @@ import (
 type File struct {
 	// The file mode.
 	Mode os.FileMode
+
+	// The flages returned for Open
+	OpenFlags fuse.OpenResponseFlags
 
 	// A channel that is written to when the value is updated to notify of
 	// a change.
@@ -124,4 +128,11 @@ func (*File) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 // interface.
 func (f *File) Node() VarNode {
 	return f
+}
+
+// Open returns the File as the handle, as well as setting and OpenFlags in the
+// response.
+func (f *File) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= f.OpenFlags
+	return f, nil
 }
