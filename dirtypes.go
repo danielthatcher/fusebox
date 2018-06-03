@@ -9,7 +9,7 @@ import (
 )
 
 type sliceElement struct {
-	Data []VarNodeable
+	Data *[]VarNodeable
 }
 
 // NewSliceDir a new Dir containing elements from the given slice.
@@ -18,31 +18,31 @@ type sliceElement struct {
 // When adding a node to the returned Dir, if the given name is empty
 // then the node is appended to the slice, otherwise if it is a string
 // containing an integer, it will overwrite the element at that index.
-func NewSliceDir(nodes []VarNodeable) *Dir {
+func NewSliceDir(nodes *[]VarNodeable) *Dir {
 	return NewDir(&sliceElement{Data: nodes})
 }
 
 // Return the node corresponding to a given index.
 func (e *sliceElement) GetNode(ctx context.Context, name string) (VarNode, error) {
 	i, err := strconv.Atoi(name)
-	if err != nil || i >= len(e.Data) {
+	if err != nil || i >= len(*e.Data) {
 		return nil, fuse.ENOENT
 	}
 
-	return e.Data[i].Node(), nil
+	return (*e.Data)[i].Node(), nil
 }
 
 func (e *sliceElement) GetDirentType(ctx context.Context, k string) (fuse.DirentType, error) {
 	i, err := strconv.Atoi(k)
-	if err != nil || i >= len(e.Data) {
+	if err != nil || i >= len(*e.Data) {
 		return fuse.DT_Unknown, fuse.ENOENT
 	}
 
-	return e.Data[i].DirentType(), nil
+	return (*e.Data)[i].DirentType(), nil
 }
 
 func (e *sliceElement) GetKeys(context.Context) []string {
-	ret := make([]string, len(e.Data))
+	ret := make([]string, len(*e.Data))
 	for i := range ret {
 		ret[i] = strconv.Itoa(i)
 	}
@@ -52,11 +52,11 @@ func (e *sliceElement) GetKeys(context.Context) []string {
 func (e *sliceElement) AddNode(name string, node interface{}) error {
 	vn, ok := node.(VarNodeable)
 	if !ok {
-		return fmt.Errorf("cannot convert node %v to VarNodeable", node)
+		return fmt.Errorf("could not convert given node (%v) to VarNodeable", node)
 	}
 
 	if name == "" {
-		e.Data = append(e.Data, vn)
+		*e.Data = append(*e.Data, vn)
 		return nil
 	}
 
@@ -65,7 +65,7 @@ func (e *sliceElement) AddNode(name string, node interface{}) error {
 		return fmt.Errorf("cannot convert given index (%v) to integer", name)
 	}
 
-	e.Data[i] = vn
+	(*e.Data)[i] = vn
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (e *sliceElement) RemoveNode(name string) error {
 		return fuse.ENOENT
 	}
 
-	e.Data = append(e.Data[:i], e.Data[:i+1]...)
+	*e.Data = append((*e.Data)[:i], (*e.Data)[:i+1]...)
 	return nil
 }
 
