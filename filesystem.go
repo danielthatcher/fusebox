@@ -18,15 +18,15 @@ var _ fs.FS = (*FS)(nil)
 
 // NewFS returns a new filesystem with the given root directory.
 func NewFS(root VarNodeable) *FS {
-	ret := &FS{RootNode: root}
-	ret.Name = "fusebox"
+	ret := &FS{RootNode: root, Name: "fusebox"}
 	return ret
 }
 
-// NewEmptyFS returns a FS with an empty Dir as its root node. This is equivalent
-// to NewFS(NewEmtpyDir())
-func NewEmptyFS() *FS {
-	return NewFS(NewEmptyDir())
+// NewEmptyFS returns a FS and the empty dir that is its root node. The resulting
+// filesystem is the same as the one returned by NewFS(NewEmptyDir())
+func NewEmptyFS() (*FS, *Dir) {
+	d := NewEmptyDir()
+	return NewFS(d), d
 }
 
 // Root returns the root directory of the filesystem
