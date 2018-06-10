@@ -246,7 +246,7 @@ func (b *bytePipeElement) ValRead(ctx context.Context) ([]byte, error) {
 	case data := <-b.Chan:
 		return data, nil
 	case <-ctx.Done():
-		return nil, fuse.ENODATA
+		return nil, fuse.EINTR
 	}
 }
 
@@ -255,7 +255,7 @@ func (b *bytePipeElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, 
 	case b.Chan <- req.Data:
 		return nil
 	case <-ctx.Done():
-		return fuse.ENODATA
+		return fuse.EINTR
 	}
 }
 
