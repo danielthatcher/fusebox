@@ -141,8 +141,8 @@ func TestDirs(t *testing.T) {
 		},
 	}}
 
-	for i, tt := range typeTests {
-		name := fmt.Sprintf("dir%v", i)
+	for _, tt := range typeTests {
+		name := "dir"
 		for _, test := range tt.additionTests {
 			mapCopy(initialTestMap, testMap)
 			sliceCopy(initialTestSlice, &testSlice)

@@ -107,8 +107,8 @@ func TestFiles(t *testing.T) {
 		},
 	}}
 
-	for i, tt := range typeTests {
-		name := fmt.Sprintf("node%v", i)
+	for _, tt := range typeTests {
+		name := "node"
 		if err := rootdir.AddNode(name, tt.node); err != nil {
 			t.Fatalf("failed to add node to dir: %v", err)
 		}

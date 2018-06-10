@@ -110,10 +110,11 @@ func (d *Dir) Attr(ctx context.Context, attr *fuse.Attr) error {
 }
 
 // Lookup returns the node corresponding to the given name if it exists.
-func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+func (d *Dir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
+	resp.EntryValid = 0
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return d.Element.GetNode(ctx, name)
+	return d.Element.GetNode(ctx, req.Name)
 }
 
 // ReadDirAll returns a []fuse.Dirent representing all nodes in the Dir.
