@@ -148,6 +148,11 @@ func (*Dir) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteR
 // Remove handles a request from the filesystem to remove a given node, passing
 // the request through to the Dir's element
 func (d *Dir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
+	r := d.Mode
+	r &= 0222
+	if d.Mode&0222 == 0 {
+		return fuse.EPERM
+	}
 	d.mu.Lock()
 	d.mu.Unlock()
 	return d.Element.RemoveNode(req.Name)
