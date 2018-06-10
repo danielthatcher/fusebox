@@ -34,8 +34,8 @@ type File struct {
 // The FileElement interface is used by File to interact with the underlying data.
 type FileElement interface {
 	// ValRead should return the value of the underlying data converted to
-	// []byte, and any errors. ctx is passed in from ReadAll, and the return
-	// value is used as the return value of ReadAll.
+	// []byte, and any errors. ctx is passed in from Read, and the return
+	// value is used as the return value of Read.
 	//
 	// This function is intended to be masked by any struct that embeds File.
 	ValRead(ctx context.Context) ([]byte, error)
@@ -85,17 +85,19 @@ func (f *File) DirentType() fuse.DirentType {
 	return fuse.DT_File
 }
 
-// ReadAll returns all the data from the File's element by calling its ValRead
+// Read returns all the data from the File's element by calling its ValRead
 // function. This function also makes a RLock and RUnlock calls to the Lock, as
 // well as checking the permissions from the value of Mode.
-func (f *File) ReadAll(ctx context.Context) ([]byte, error) {
+func (f *File) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	if f.Mode&0444 == 0 {
-		return nil, fuse.EPERM
+		return fuse.EPERM
 	}
 
 	f.Lock.RLock()
 	defer f.Lock.RUnlock()
-	return f.Element.ValRead(ctx)
+	data, err := f.Element.ValRead(ctx)
+	resp.Data = data
+	return err
 }
 
 // Write writes the data to the File's element by calling its ValWrite function.

@@ -14,7 +14,7 @@ import (
 // any kind of node in the filesystem.
 type VarNode interface {
 	fs.Node
-	fs.HandleReadAller
+	fs.HandleReader
 	fs.HandleWriter
 }
 
@@ -135,9 +135,9 @@ func (d *Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return subdirs, nil
 }
 
-// ReadAll returns fuse.EPERM for Dir.
-func (*Dir) ReadAll(ctx context.Context) ([]byte, error) {
-	return nil, fuse.EPERM
+// Read returns fuse.EPERM for Dir.
+func (*Dir) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	return fuse.EPERM
 }
 
 // Cannot write directly to a directory.

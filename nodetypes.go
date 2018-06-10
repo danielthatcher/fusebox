@@ -228,3 +228,37 @@ func (f *urlElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp 
 func (f *urlElement) Size(context.Context) (uint64, error) {
 	return uint64(len(f.Data.String())), nil
 }
+
+type bytePipeElement struct {
+	Chan chan []byte
+}
+
+// NewBytePipeFile returns a File that has an element which reads and writes
+// bytes to a channel with blocking.
+func NewBytePipeFile(c chan []byte) *File {
+	ret := NewFile(&bytePipeElement{Chan: c})
+	ret.OpenFlags = fuse.OpenDirectIO
+	return ret
+}
+
+func (b *bytePipeElement) ValRead(ctx context.Context) ([]byte, error) {
+	select {
+	case data := <-b.Chan:
+		return data, nil
+	case <-ctx.Done():
+		return nil, fuse.ENODATA
+	}
+}
+
+func (b *bytePipeElement) ValWrite(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+	select {
+	case b.Chan <- req.Data:
+		return nil
+	case <-ctx.Done():
+		return fuse.ENODATA
+	}
+}
+
+func (*bytePipeElement) Size(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
